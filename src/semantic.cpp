@@ -191,9 +191,22 @@ void SemanticAnalyzer::validateSelectClause(const ParseTree &node) {
 // ============================================================================
 void SemanticAnalyzer::validateWhereClause(const ParseTree &node) {
   for (const auto &child : node->children) {
-    if (child->type == NodeType::CONDITION) {
-      validateCondition(child);
+    validateExpression(child);
+  }
+}
+
+// ============================================================================
+// EXPRESSION VALIDATION - Recursively traverse AND/OR expression trees
+// ============================================================================
+void SemanticAnalyzer::validateExpression(const ParseTree &node) {
+  if (!node) return;
+
+  if (node->type == NodeType::AND_EXPR || node->type == NodeType::OR_EXPR) {
+    for (const auto &child : node->children) {
+      validateExpression(child);
     }
+  } else if (node->type == NodeType::CONDITION) {
+    validateCondition(node);
   }
 }
 

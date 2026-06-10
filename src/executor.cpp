@@ -66,7 +66,7 @@ QueryResult Executor::executeSelect(const ParseTree &tree) {
   bool selectAll = false;
 
   // WHERE clause info
-  std::string whereCol, whereOp, whereVal;
+  ParseTree whereExpr = nullptr;
   bool hasWhere = false;
 
   // Extract information from parse tree
@@ -96,17 +96,8 @@ QueryResult Executor::executeSelect(const ParseTree &tree) {
       }
     } else if (child->type == NodeType::WHERE_CLAUSE) {
       hasWhere = true;
-      for (const auto &wc : child->children) {
-        if (wc->type == NodeType::CONDITION) {
-          for (const auto &cc : wc->children) {
-            if (cc->type == NodeType::COLUMN)
-              whereCol = cc->value;
-            else if (cc->type == NodeType::OPERATOR)
-              whereOp = cc->value;
-            else if (cc->type == NodeType::VALUE)
-              whereVal = cc->value;
-          }
-        }
+      if (!child->children.empty()) {
+        whereExpr = child->children[0];
       }
     }
   }
@@ -118,8 +109,10 @@ QueryResult Executor::executeSelect(const ParseTree &tree) {
 
   // Fetch rows
   std::vector<Row> rows;
-  if (hasWhere) {
-    rows = dataStore.getFilteredRows(tableName, whereCol, whereOp, whereVal);
+  if (hasWhere && whereExpr) {
+    rows = dataStore.getFilteredRows(tableName, [&](const Row &row) {
+      return evaluateExpression(whereExpr, row);
+    });
   } else {
     rows = dataStore.getRows(tableName);
   }
@@ -187,7 +180,7 @@ QueryResult Executor::executeUpdate(const ParseTree &tree) {
 
   std::string tableName;
   std::string setCol, setVal;
-  std::string whereCol, whereOp, whereVal;
+  ParseTree whereExpr = nullptr;
   bool hasWhere = false;
 
   for (const auto &child : tree->children) {
@@ -208,29 +201,21 @@ QueryResult Executor::executeUpdate(const ParseTree &tree) {
       }
     } else if (child->type == NodeType::WHERE_CLAUSE) {
       hasWhere = true;
-      for (const auto &wc : child->children) {
-        if (wc->type == NodeType::CONDITION) {
-          for (const auto &cc : wc->children) {
-            if (cc->type == NodeType::COLUMN)
-              whereCol = cc->value;
-            else if (cc->type == NodeType::OPERATOR)
-              whereOp = cc->value;
-            else if (cc->type == NodeType::VALUE)
-              whereVal = cc->value;
-          }
-        }
+      if (!child->children.empty()) {
+        whereExpr = child->children[0];
       }
     }
   }
 
-  if (!hasWhere) {
+  if (!hasWhere || !whereExpr) {
     result.message = "UPDATE without WHERE is not supported for safety.";
     result.success = false;
     return result;
   }
 
-  int count = dataStore.updateRows(tableName, setCol, setVal, whereCol, whereOp,
-                                   whereVal);
+  int count = dataStore.updateRows(tableName, setCol, setVal, [&](const Row &row) {
+    return evaluateExpression(whereExpr, row);
+  });
   result.success = true;
   result.affectedRows = count;
   result.message = std::to_string(count) + " row(s) updated successfully.";
@@ -248,7 +233,7 @@ QueryResult Executor::executeDelete(const ParseTree &tree) {
   QueryResult result;
 
   std::string tableName;
-  std::string whereCol, whereOp, whereVal;
+  ParseTree whereExpr = nullptr;
   bool hasWhere = false;
 
   for (const auto &child : tree->children) {
@@ -262,24 +247,17 @@ QueryResult Executor::executeDelete(const ParseTree &tree) {
       }
     } else if (child->type == NodeType::WHERE_CLAUSE) {
       hasWhere = true;
-      for (const auto &wc : child->children) {
-        if (wc->type == NodeType::CONDITION) {
-          for (const auto &cc : wc->children) {
-            if (cc->type == NodeType::COLUMN)
-              whereCol = cc->value;
-            else if (cc->type == NodeType::OPERATOR)
-              whereOp = cc->value;
-            else if (cc->type == NodeType::VALUE)
-              whereVal = cc->value;
-          }
-        }
+      if (!child->children.empty()) {
+        whereExpr = child->children[0];
       }
     }
   }
 
   int count;
-  if (hasWhere) {
-    count = dataStore.deleteRows(tableName, whereCol, whereOp, whereVal);
+  if (hasWhere && whereExpr) {
+    count = dataStore.deleteRows(tableName, [&](const Row &row) {
+      return evaluateExpression(whereExpr, row);
+    });
   } else {
     count = dataStore.deleteAllRows(tableName);
   }
@@ -389,6 +367,56 @@ void Executor::printResultTable(const QueryResult &result) const {
   }
 
   std::cout << result.rows.size() << " row(s) in set\n";
+}
+
+bool Executor::evaluateExpression(const ParseTree &expr, const Row &row) const {
+  if (!expr) return false;
+
+  if (expr->type == NodeType::AND_EXPR) {
+    if (expr->children.size() < 2) return false;
+    return evaluateExpression(expr->children[0], row) && evaluateExpression(expr->children[1], row);
+  }
+  if (expr->type == NodeType::OR_EXPR) {
+    if (expr->children.size() < 2) return false;
+    return evaluateExpression(expr->children[0], row) || evaluateExpression(expr->children[1], row);
+  }
+  if (expr->type == NodeType::CONDITION) {
+    std::string columnName;
+    std::string op;
+    std::string value;
+
+    for (const auto &child : expr->children) {
+      if (child->type == NodeType::COLUMN) {
+        columnName = child->value;
+      } else if (child->type == NodeType::OPERATOR) {
+        op = child->value;
+      } else if (child->type == NodeType::VALUE) {
+        value = child->value;
+      }
+    }
+
+    if (columnName.empty()) return false;
+
+    // Case-insensitive lookup of column name in row
+    std::string lowerCol = columnName;
+    std::transform(lowerCol.begin(), lowerCol.end(), lowerCol.begin(), ::tolower);
+
+    auto it = row.end();
+    for (auto rowCol = row.begin(); rowCol != row.end(); ++rowCol) {
+      std::string rowColLower = rowCol->first;
+      std::transform(rowColLower.begin(), rowColLower.end(), rowColLower.begin(), ::tolower);
+      if (rowColLower == lowerCol) {
+        it = rowCol;
+        break;
+      }
+    }
+
+    if (it != row.end()) {
+      return dataStore.compareValues(it->second, op, value);
+    }
+    return false;
+  }
+  return false;
 }
 
 } // namespace MiniSQL

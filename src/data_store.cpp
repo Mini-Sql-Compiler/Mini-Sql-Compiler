@@ -132,20 +132,15 @@ std::vector<Row> DataStore::getRows(const std::string &tableName) const {
 // GET FILTERED ROWS (WHERE clause)
 // ============================================================================
 std::vector<Row> DataStore::getFilteredRows(const std::string &tableName,
-                                            const std::string &column,
-                                            const std::string &op,
-                                            const std::string &value) const {
+                                            std::function<bool(const Row&)> predicate) const {
   auto it = tables.find(tableName);
   if (it == tables.end())
     return {};
 
   std::vector<Row> result;
   for (const auto &row : it->second.rows) {
-    auto colIt = row.find(column);
-    if (colIt != row.end()) {
-      if (compareValues(colIt->second, op, value)) {
-        result.push_back(row);
-      }
+    if (predicate(row)) {
+      result.push_back(row);
     }
   }
   return result;
@@ -157,21 +152,16 @@ std::vector<Row> DataStore::getFilteredRows(const std::string &tableName,
 int DataStore::updateRows(const std::string &tableName,
                           const std::string &setColumn,
                           const std::string &setValue,
-                          const std::string &whereColumn,
-                          const std::string &whereOp,
-                          const std::string &whereValue) {
+                          std::function<bool(const Row&)> predicate) {
   auto it = tables.find(tableName);
   if (it == tables.end())
     return 0;
 
   int count = 0;
   for (auto &row : it->second.rows) {
-    auto colIt = row.find(whereColumn);
-    if (colIt != row.end()) {
-      if (compareValues(colIt->second, whereOp, whereValue)) {
-        row[setColumn] = setValue;
-        count++;
-      }
+    if (predicate(row)) {
+      row[setColumn] = setValue;
+      count++;
     }
   }
   return count;
@@ -181,9 +171,7 @@ int DataStore::updateRows(const std::string &tableName,
 // DELETE ROWS
 // ============================================================================
 int DataStore::deleteRows(const std::string &tableName,
-                          const std::string &whereColumn,
-                          const std::string &whereOp,
-                          const std::string &whereValue) {
+                          std::function<bool(const Row&)> predicate) {
   auto it = tables.find(tableName);
   if (it == tables.end())
     return 0;
@@ -193,12 +181,7 @@ int DataStore::deleteRows(const std::string &tableName,
   it->second.rows.erase(
       std::remove_if(it->second.rows.begin(), it->second.rows.end(),
                      [&](const Row &row) {
-                       auto colIt = row.find(whereColumn);
-                       if (colIt != row.end()) {
-                         return compareValues(colIt->second, whereOp,
-                                              whereValue);
-                       }
-                       return false;
+                       return predicate(row);
                      }),
       it->second.rows.end());
 

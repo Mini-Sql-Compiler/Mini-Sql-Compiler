@@ -204,7 +204,9 @@ enum class NodeType {
   DELETE_QUERY,
   VALUE_LIST,
   ASSIGNMENT,
-  SET_CLAUSE
+  SET_CLAUSE,
+  AND_EXPR,
+  OR_EXPR
 };
 
 inline std::string nodeTypeToString(NodeType type) {
@@ -241,6 +243,10 @@ inline std::string nodeTypeToString(NodeType type) {
     return "ASSIGNMENT";
   case NodeType::SET_CLAUSE:
     return "SET_CLAUSE";
+  case NodeType::AND_EXPR:
+    return "AND_EXPR";
+  case NodeType::OR_EXPR:
+    return "OR_EXPR";
   default:
     return "UNKNOWN_NODE";
   }

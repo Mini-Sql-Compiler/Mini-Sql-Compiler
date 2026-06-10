@@ -12,6 +12,7 @@
 #define DATA_STORE_H
 
 #include "symbol_table.h"
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -55,27 +56,23 @@ public:
   std::vector<Row> getRows(const std::string &tableName) const;
 
   /**
-   * Get rows matching a WHERE condition
+   * Get rows matching a predicate
    */
   std::vector<Row> getFilteredRows(const std::string &tableName,
-                                   const std::string &column,
-                                   const std::string &op,
-                                   const std::string &value) const;
+                                   std::function<bool(const Row&)> predicate) const;
 
   /**
-   * Update rows matching a condition
+   * Update rows matching a predicate
    * @return number of rows updated
    */
   int updateRows(const std::string &tableName, const std::string &setColumn,
-                 const std::string &setValue, const std::string &whereColumn,
-                 const std::string &whereOp, const std::string &whereValue);
+                 const std::string &setValue, std::function<bool(const Row&)> predicate);
 
   /**
-   * Delete rows matching a condition
+   * Delete rows matching a predicate
    * @return number of rows deleted
    */
-  int deleteRows(const std::string &tableName, const std::string &whereColumn,
-                 const std::string &whereOp, const std::string &whereValue);
+  int deleteRows(const std::string &tableName, std::function<bool(const Row&)> predicate);
 
   /**
    * Delete all rows from a table
@@ -108,17 +105,17 @@ public:
    */
   bool tableExists(const std::string &tableName) const;
 
-private:
-  /**
-   * Load sample data into tables
-   */
-  void loadSampleData();
-
   /**
    * Compare two values based on operator
    */
   bool compareValues(const std::string &left, const std::string &op,
                      const std::string &right) const;
+
+private:
+  /**
+   * Load sample data into tables
+   */
+  void loadSampleData();
 };
 
 } // namespace MiniSQL

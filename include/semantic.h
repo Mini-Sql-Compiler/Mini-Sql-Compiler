@@ -48,6 +48,7 @@ private:
   void validateSelectClause(const ParseTree &node);
   void validateFromClause(const ParseTree &node);
   void validateWhereClause(const ParseTree &node);
+  void validateExpression(const ParseTree &node);
   void validateCondition(const ParseTree &node);
   void validateColumn(const std::string &columnName, int line, int col);
   void validateInsert(const ParseTree &node);

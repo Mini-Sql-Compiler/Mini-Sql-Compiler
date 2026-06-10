@@ -65,6 +65,10 @@ private:
   ParseTree parseColumnList();
   ParseTree parseFromClause();
   ParseTree parseWhereClause();
+  ParseTree parseExpression();
+  ParseTree parseLogicalOr();
+  ParseTree parseLogicalAnd();
+  ParseTree parsePrimary();
   ParseTree parseCondition();
   ParseTree parseInsert();
   ParseTree parseUpdate();

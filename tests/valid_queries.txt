@@ -25,3 +25,6 @@ SELECT name FROM departments;
 
 # Test Case 8: SELECT with WHERE on string value
 SELECT id, name FROM employees WHERE department = 'Sales';
+
+# Test Case 9: SELECT with compound AND/OR and parentheses
+SELECT name, salary FROM employees WHERE (salary > 80000 OR department = 'HR') AND age < 40;

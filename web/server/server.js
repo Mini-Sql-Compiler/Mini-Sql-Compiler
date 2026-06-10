@@ -93,6 +93,8 @@ app.get('/api/examples', (req, res) => {
     valid: [
       { name: 'Select All Employees', query: 'SELECT * FROM employees;' },
       { name: 'Filter by Salary', query: 'SELECT name, salary FROM employees WHERE salary > 70000;' },
+      { name: 'Compound AND Filter', query: "SELECT * FROM employees WHERE age > 30 AND department = 'Engineering';" },
+      { name: 'Compound OR & Parentheses', query: "SELECT name, salary FROM employees WHERE salary > 80000 OR (age < 30 AND department = 'HR');" },
       { name: 'User Emails', query: 'SELECT username, email FROM users WHERE age > 25;' },
       { name: 'Product Catalog', query: 'SELECT name, price, quantity FROM products;' },
       { name: 'Department Budgets', query: 'SELECT name, budget FROM departments;' },

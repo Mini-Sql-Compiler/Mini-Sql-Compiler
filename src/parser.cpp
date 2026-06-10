@@ -206,14 +206,72 @@ ParseTree Parser::parseWhereClause() {
   auto whereNode =
       std::make_shared<ParseTreeNode>(NodeType::WHERE_CLAUSE, "WHERE");
 
-  auto condition = parseCondition();
-  if (condition) {
-    whereNode->addChild(condition);
+  auto expr = parseExpression();
+  if (expr) {
+    whereNode->addChild(expr);
   } else {
     return nullptr;
   }
 
   return whereNode;
+}
+
+// ============================================================================
+// GRAMMAR RULE: <expression> ::= <logical_or>
+// ============================================================================
+ParseTree Parser::parseExpression() {
+  return parseLogicalOr();
+}
+
+// ============================================================================
+// GRAMMAR RULE: <logical_or> ::= <logical_and> { OR <logical_and> }*
+// ============================================================================
+ParseTree Parser::parseLogicalOr() {
+  auto expr = parseLogicalAnd();
+  if (!expr) return nullptr;
+
+  while (match(TokenType::KEYWORD_OR)) {
+    auto orNode = std::make_shared<ParseTreeNode>(NodeType::OR_EXPR, "OR");
+    auto right = parseLogicalAnd();
+    if (!right) return nullptr;
+    orNode->addChild(expr);
+    orNode->addChild(right);
+    expr = orNode;
+  }
+
+  return expr;
+}
+
+// ============================================================================
+// GRAMMAR RULE: <logical_and> ::= <primary> { AND <primary> }*
+// ============================================================================
+ParseTree Parser::parseLogicalAnd() {
+  auto expr = parsePrimary();
+  if (!expr) return nullptr;
+
+  while (match(TokenType::KEYWORD_AND)) {
+    auto andNode = std::make_shared<ParseTreeNode>(NodeType::AND_EXPR, "AND");
+    auto right = parsePrimary();
+    if (!right) return nullptr;
+    andNode->addChild(expr);
+    andNode->addChild(right);
+    expr = andNode;
+  }
+
+  return expr;
+}
+
+// ============================================================================
+// GRAMMAR RULE: <primary> ::= <condition> | ( <expression> )
+// ============================================================================
+ParseTree Parser::parsePrimary() {
+  if (match(TokenType::OP_LPAREN)) {
+    auto expr = parseExpression();
+    if (!expr) return nullptr;
+    consume(TokenType::OP_RPAREN, "Expected ')' after expression");
+    return expr;
+  }
+  return parseCondition();
 }
 
 // ============================================================================

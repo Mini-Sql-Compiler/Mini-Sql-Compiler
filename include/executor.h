@@ -40,6 +40,9 @@ private:
   QueryResult executeUpdate(const ParseTree &tree);
   QueryResult executeDelete(const ParseTree &tree);
 
+  // Evaluate condition recursively
+  bool evaluateExpression(const ParseTree &expr, const Row &row) const;
+
   // Extract information from parse tree
   std::string extractTableName(const ParseTree &tree) const;
   std::vector<std::string> extractColumns(const ParseTree &tree) const;
